@@ -1,0 +1,8 @@
+# -*- shell-script -*-
+
+source ./cdbackup.py
+
+aws glacier initiate-job \
+    --account-id $MyAccount --vault-name $MyVault \
+    --job-parameters '{"Type": "inventory-retrieval"}'
+aws glacier list-jobs --account-id $MyAccount --vault-name $MyVault
