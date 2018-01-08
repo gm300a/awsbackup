@@ -1,3 +1,4 @@
+#!/bin/sh
 # -*- shell-script -*-
 source ./local.py
 aws glacier list-jobs --account-id $MyAccount --vault-name $MyVault

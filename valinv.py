@@ -10,11 +10,14 @@ for j in jd['ArchiveList']:
     #print(j['CreationDate'])
     #print(j['Size'])
     if j['ArchiveDescription'] == '':
-        continue
-    n = j['ArchiveDescription'].split('/')
-    if n[0] != 'v3':
-        continue
-    print(n[2].replace('@3','/').replace('@2',' ').replace('@1',':').replace('@0','@'),'part',n[4],("%7.3fGB"%(int(j['Size'])/1024/1024/1024)))
+        dsc='-no descrtiption-'
+    else:
+        n = j['ArchiveDescription'].split('/')
+        if n[0] != 'v3':
+            dsc='-format error:'+n[0]
+        else:
+            dsc=n[2].replace('@3','/').replace('@2',' ').replace('@1',':').replace('@0','@')+' part '+n[4]
+    print(dsc,("%7.3fGB"%(int(j['Size'])/1024/1024/1024)))
     
     
           
