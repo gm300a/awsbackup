@@ -12,7 +12,7 @@ from local import *
 print("ACCNTID="+MyAccount,end=';')
 print("VALNAME="+MyVault)
 
-sw=1
+sw=0
 if sw == 1:
     fj=open('log/arcret.job.log','r')
     jd=json.load(fj)
@@ -31,4 +31,4 @@ for j in jd['JobList']:
          print('#StatusCode is',j['StatusCode'])
          continue
     print("JOBID="+j['JobId'])
-    print('aws glacier get-job-output --account-id $ACCNTID --vault-name $VALNAME --job-id $JOBID dst/valdwn.dat')
+    print('aws glacier get-job-output --account-id $ACCNTID --vault-name $VALNAME --job-id $JOBID dst/valdwn.1.dat')

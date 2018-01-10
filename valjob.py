@@ -2,19 +2,18 @@
 import sys
 import os.path
 import json
+import subprocess
 
 # you need to set your own Account and Vault Name in local.py file
 MyAccount="Empty"
 MyVault="Empty"
-from local import *
+from cdbackup import *
 
 fn=sys.argv[1]
 
-print("ACCNTID="+MyAccount,end=';')
-print("VALNAME="+MyVault)
+r = subprocess.getoutput("aws glacier list-jobs --account-id %s --vault-name %s" % (MyAccount,MyVault))
+jd=json.loads(r)
 
-fj=open("p1","r")
-jd=json.load(fj)
 cnt=0
 for j in jd['JobList']:
     if j['Completed'] != 1 or j['Action'] != 'InventoryRetrieval':
@@ -25,9 +24,10 @@ for j in jd['JobList']:
     if j['StatusCode'] != 'Succeeded':
          print('StatusCode is',j['StatusCode'])
          continue
-    print("JOBID="+j['JobId'])
-    print("aws glacier describe-job --account-id $ACCNTID --vault-name $VALNAME --job-id $JOBID")
-    print("aws glacier get-job-output --account-id $ACCNTID --vault-name $VALNAME --job-id $JOBID "+fn+(".%2.2d" % cnt))
+    jid=j['JobId']
+    print(subprocess.getoutput("aws glacier describe-job --account-id %s --vault-name %s --job-id %s" % (MyAccount,MyVault,jid)))
+    print(subprocess.getoutput("aws glacier get-job-output --account-id %s --vault-name %s --job-id %s %s.%2.2d" % \
+                               (MyAccount,MyVault,jid,fn,cnt)))
     cnt = cnt+1
     
           
