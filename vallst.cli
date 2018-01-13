@@ -4,5 +4,6 @@ source ./cdbackup.py
 
 aws glacier initiate-job \
     --account-id $MyAccount --vault-name $MyVault \
-    --job-parameters '{"Type": "inventory-retrieval"}'
+    --job-parameters '{"Type": "inventory-retrieval","SNSTopic": "arn:aws:sns:ap-northeast-1:895062872972:gm300_glacier_vault"}'
+     #--cli-input-json ./vallst.json
 aws glacier list-jobs --account-id $MyAccount --vault-name $MyVault
