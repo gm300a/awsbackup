@@ -27,7 +27,6 @@ if os.path.exists('.glaws.vault.json'):
     for m in jvault['VaultList']:
         if 'ShortName' in m and m['ShortName'] == t: t=m['VaultName']
 opt['VaultName']=t
-
 jjob=dict()
 t = '@None@' if not '--job-id' in argv else argv[argv.index('--job-id')+1]
 if os.path.exists('.glaws.job.json'):
@@ -40,11 +39,9 @@ if os.path.exists('.glaws.job.json'):
         if not ('VaultName' in m):continue
         if not ('VaultName' in opt) or opt['VaultName'] != '@None@' : continue
         opt['VaultName'] = m['VaultName']
-
 opt['JobId']=t
 #print(opt['VaultName'])
 #print(opt['JobId'])
-
 if argv[0] == 'bucket' or argv[0] == 'vault':
     if argv[1] == 'ls':
         if not opt['Verbose']:print("#sid #name")
@@ -62,8 +59,9 @@ if argv[0] == 'bucket' or argv[0] == 'vault':
         json.dump(jvault,fp=fh)
         fh.close()
     elif argv[1] == 'describe' or argv[1] == 'des':
-        print(subprocess.getoutput('aws glacier describe-vault --account-id %s --vault-name %s' % \
-                                            (MyAccount,opt['VaultName'])))
+        print(subprocess.getoutput(
+            'aws glacier describe-vault --account-id %s --vault-name %s' % \
+            (MyAccount,opt['VaultName'])))
     else:
         print('option for vault is \"ls\" or \"describe\"')
 
@@ -73,13 +71,20 @@ elif argv[0] == 'job':
             print('--vault-name is needed')
             exit(1)
         cnt=0
-        jjob=json.loads(subprocess.getoutput('aws glacier list-jobs --account-id %s --vault-name %s' % (MyAccount,opt['VaultName'])))
-        for m in jjob['JobList']:
-            m['ShortId'] = ("@J%2.2x" % cnt)
-            m['VaultName'] = opt['VaultName']
-            s = re.sub('^.*?:vaults/','',m['VaultARN'])
-            print("%s %s %s %s" % (m['ShortId'],m['Action'],m['StatusCode'],s))
-            cnt = cnt+1
+        jjob=dict()
+        for v in jvault['VaultList']: ## multi vault code is not completed.
+            if opt['VaultName'] != v['VaultName'] and opt['VaultName'] != '@ALL@': continue
+            #print(('# vault %s is under scan' % v['VaultName']))
+            r=subprocess.getoutput(
+                'aws glacier list-jobs --account-id %s --vault-name %s'
+                % (MyAccount,v['VaultName']))
+            jjob=json.loads(r)
+            for m in jjob['JobList']:
+                m['ShortId'] = ("@J%2.2x" % cnt)
+                m['VaultName'] = v['VaultName']
+                s = re.sub('^.*?:vaults/','',m['VaultARN'])
+                print("%s %s %s %s" % (m['ShortId'],m['Action'],m['StatusCode'],s))
+                cnt = cnt+1
         fh=open('.glaws.job.json','w')
         json.dump(jjob,fp=fh)
         fh.close()
@@ -87,10 +92,14 @@ elif argv[0] == 'job':
         if opt['VaultName'] == '@None@' or opt['JobId'] == '@None':
             print('--vault-name is needed')
             exit(1)
-        print(json.loads(subprocess.getoutput('aws glacier describe-job --account-id %s --vault-name %s --job-id %s' % (MyAccount,opt['VaultName'],opt['JobId']))))
+        print(json.loads(subprocess.getoutput(
+            'aws glacier describe-job --account-id %s --vault-name %s --job-id %s'
+            % (MyAccount,opt['VaultName'],opt['JobId']))))
     elif argv[1] == 'get':
         t0 = datetime.now()
-        r=subprocess.getoutput('aws glacier get-job-output --account-id %s --vault-name %s --job-id %s %s' % (MyAccount,opt['VaultName'],opt['JobId'],opt['FileName']))
+        r=subprocess.getoutput(
+            'aws glacier get-job-output --account-id %s --vault-name %s --job-id %s %s'
+            % (MyAccount,opt['VaultName'],opt['JobId'],opt['FileName']))
         t1 = datetime.now()
         print(r)
         print('# download %s %d day, %d sec, %d msec' % (opt['FileName'],(t1-t0).days,(t1-t0).seconds,(t1-t0).microseconds))
@@ -106,9 +115,17 @@ elif argv[0] == 'job':
     else:
         print('option for job is \"ls\" or \"describe\"')
 elif argv[0] == 'archieve' or argv[0] == 'arch':
-    if argv[1] == 'ls':
-        if '--vault-name' in argv:
-            print('aws glacier initiate-job --account-id %s --vault-name %s --job-parameters %s' % (MyAccount,argv[argv.index('--vault-name')+1],"\'{\"Type\": \"inventory-retrieval\"}\'"))
+    if argv[1] == 'submit-ls':
+        if opt['VaultName'] != '@None@':
+            r=subprocess.getoutput('aws glacier initiate-job --account-id %s --vault-name %s --job-parameters %s' % (MyAccount,opt['VaultName'],"\'{\"Type\": \"inventory-retrieval\"}\'"))
+            jo = json.loads(r)
+            print(r)
+        else:
+            print('--vault-name is needed')
+            exit(1)
+    else:
+        print('option for archive is \"submit-ls\" or \"describe\"')
+        
 else:
     print('object type must be one \"vault\",\"job\",\"archive\"')
             #print(subprocess.getoutput('aws glacier initiate-job --account-id %s --vault-name %s --job-parameters %s' % (MyAccount,argv[argv.index('--vault-name')+1],"\'{\"Type\": \"inventory-retrieval\"}\'")))
