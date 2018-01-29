@@ -108,6 +108,10 @@ elif argv[0] == 'job':
         jo['GetOps'] = {'Start': t0.strftime('v3/%Y-%m-%d %H:%M:%S'),
                         'End': t1.strftime('v3/%Y-%m-%d %H:%M:%S'),
                         'Duration': tn}
+        for m in jjob['JobList']:
+            if opt['JobId'] == m['JobId'] and 'ArchiveSizeInBytes' in m:
+                jo['GetOps']['Size'] = m['ArchiveSizeInBytes']
+                
         fh=open('.glaws.getjob.log','a')
         json.dump(jo,fp=fh)
         fh.write('\n')
