@@ -1,11 +1,11 @@
 #! env python3
-import sys
-import os.path
-import json
-import re
 from datetime import datetime
 from treehash import TreeHash
+import json
+import os.path
+import re
 import subprocess
+import sys
 
 # you need to set your own Account and Vault Name in local.py file
 (csize,MyAccount,MyVault)=(1024*1024*256,"Empty","Empty") # 256MB for test
