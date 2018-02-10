@@ -31,7 +31,7 @@ flog=open('.up2val.file.log','a')
 for fn in fnl:
     print('# target file:'+fn)
     print('# target file:'+fn,file=flog,flush=True)
-    (fs,cs,ft,mt,cn)=(os.path.getsize(fn),cszie,open(fn,'rb'),TreeHash(),0)
+    (fs,cs,ft,mt,cn)=(os.path.getsize(fn),csize,open(fn,'rb'),TreeHash(),0)
     print(('## chunk size :%.3f Gb' % (int(cs)/1024/1024/1024)))
     for x in range(0,fs,cs):
         rs=ft.read(cs)
@@ -40,29 +40,42 @@ for fn in fnl:
         cn=cn+1
     ft.close()
     arcdsc=datetime.now().strftime('v3/%Y-%m-%d@2%H@1%M@1%S/')+\
-            fn.replace('@','@0').replace(':','@1').replace(' ','@2').replace('/','@3')+'/'+mt.hexdigest()+'/0'
-    jt=json.loads(subprocess.getoutput(('aws glacier initiate-multipart-upload --account-id %s --vault-name %s ' \
-                                      % (MyAccount,MyVault))+\
-                                      ('--archive-description \"%s\" --part-size %d' % (arcdsc,cs))))
-    print(jt)
-    upid=jt['uploadId']
-    print("## upload id "+upid)
+            fn.replace('@','@0').replace(':','@1').replace(' ','@2').replace('/','@3')+\
+            '/'+mt.hexdigest()+'/0'
+    while(1):
+        a=(('aws glacier initiate-multipart-upload --account-id %s --vault-name %s ' \
+            % (MyAccount,MyVault))+\
+           ('--archive-description \"%s\" --part-size %d' % (arcdsc,cs)))
+        print(a)
+        jt=json.loads(subprocess.getoutput(a))
+        print(jt)
+        upid=jt['uploadId']
+        print("## upload id "+upid)
+        if upid[0] != '-':
+            break
+
     (rp,cn)=(0,0)
     for x in range(0,fs,cs):
         fr=open(('tmp%2.2d' % cn),'rb') ;rs=fr.read(cs) ;fr.close()
         mp=TreeHash();mp.update(rs);fl=len(rs)
-        r=subprocess.getoutput(('aws glacier upload-multipart-part --account-id %s --vault-name %s ' \
-                               % (MyAccount,MyVault))+\
-                               ('--body \'%s\' --upload-id %s ' % (('tmp%2.2d' % cn),upid))+\
-                               ('--range \"bytes %d-%d/*\" --checksum \"%s\"' % (rp,rp+fl-1,mp.hexdigest())))
+        
+        a=(('aws glacier upload-multipart-part --account-id %s --vault-name %s ' \
+                % (MyAccount,MyVault))+\
+               ('--body \'%s\' --upload-id %s ' % (('tmp%2.2d' % cn),upid))+\
+               ('--range \"bytes %d-%d/*\" --checksum \"%s\"' % (rp,rp+fl-1,mp.hexdigest())))
+        print(a)
+        r=subprocess.getoutput(a)
         print(r)
         print(('#   done part %2d, %6.3f Gb (%12d b)' % (cn,fl/1024/1024/1024.,fl)),flush=True)
         cn=cn+1
         rp=rp+fl
         fr.close()
 
-    r=subprocess.getoutput(('aws glacier complete-multipart-upload --account-id %s --vault-name %s ' \
-                            % (MyAccount,MyVault))+\
-                           ('--upload-id %s --checksum \"%s\"' % (upid,mt.hexdigest())))
-        
+    a=(('aws glacier complete-multipart-upload --account-id %s --vault-name %s ' \
+        % (MyAccount,MyVault))+\
+       ('--upload-id %s --checksum \"%s\"  --archive-size %d' %\
+        (upid,mt.hexdigest(),fs)))
+    print(a)
+    r=subprocess.getoutput(a)
+    print(r)
     #print('#  done',file=flog,flush=True)

@@ -13,10 +13,9 @@ from local import *
 
 argv=sys.argv[1:]
 opt=dict()
-opt['Verbose']='--verbose' in argv
-for i in range(0,10000):
-    opt['FileName']=('log/glaws.%3.3X.output' % i)
-    if not os.path.exists(opt['FileName']):break
+opt['Verbose']=('--verbose' in argv)
+opt['FileName'] = '@None@' if not '--file-name' in argv else argv[argv.index('--file-name')+1]
+    
 #print(opt['FileName'])
 jvault=dict()
 t = '@None@' if not '--vault-name' in argv else argv[argv.index('--vault-name')+1]
@@ -83,7 +82,12 @@ elif argv[0] == 'job':
                 m['ShortId'] = ("@J%2.2x" % cnt)
                 m['VaultName'] = v['VaultName']
                 s = re.sub('^.*?:vaults/','',m['VaultARN'])
-                print("%s %s %s %s" % (m['ShortId'],m['Action'],m['StatusCode'],s))
+                if not opt['Verbose'] :
+                    print("%s %s %s %s" % (m['ShortId'],m['Action'],m['StatusCode'],s))
+                if not m['Completed']:
+                    print("%s %s %s %s %s" % (m['ShortId'],m['Action'],m['CreationDate'],m['StatusCode'],s))
+                else:
+                    print("%s %s %s %s %s" % (m['ShortId'],m['Action'],m['CreationDate'],m['CompletionDate'],s))
                 cnt = cnt+1
         fh=open('.glaws.job.json','w')
         json.dump(jjob,fp=fh)
@@ -96,6 +100,11 @@ elif argv[0] == 'job':
             'aws glacier describe-job --account-id %s --vault-name %s --job-id %s'
             % (MyAccount,opt['VaultName'],opt['JobId']))))
     elif argv[1] == 'get':
+        if opt['FileName'] == '@None@':
+            for i in range(0,10000):
+                opt['FileName']=('log/glaws.%3.3X.output' % i)
+                if not os.path.exists(opt['FileName']):break
+        
         t0 = datetime.now()
         r=subprocess.getoutput(
             'aws glacier get-job-output --account-id %s --vault-name %s --job-id %s %s'
@@ -127,9 +136,33 @@ elif argv[0] == 'archieve' or argv[0] == 'arch':
         else:
             print('--vault-name is needed')
             exit(1)
-    else:
+    elif argv[1] == 'cache-ls':
+        if opt['FileName'] == '@None@':
+            print('--file-name is needed')
+        else:
+            fh=open(opt['FileName'],'r')
+            jo=json.load(fh)
+            for m in jo['ArchiveList']:
+                if m['ArchiveDescription'] == '':
+                    dsc='-no descrtiption-'
+                else:
+                    n = m['ArchiveDescription'].split('/')
+                    if n[0] != 'v3':
+                        dsc='-format error:'+n[0]
+                    else:
+                        dsc=n[1].replace('@2',' ').replace('@1',':')+' '+n[2].replace('@3','/').replace('@2',' ').replace('@1',':').replace('@0','@')
+                print(('%s %7.3fG %s' % (m['CreationDate'],int(m['Size'])/1024/1024/1024,dsc)))
+    else:    
         print('option for archive is \"submit-ls\" or \"describe\"')
         
+elif argv[0] == 'config' or argv[0] == 'conf':
+    if argv[1] == 'region':
+        if len(argv) < 3:
+            fh=open(os.environ.get('HOME')+'/.aws/config','r')
+            print(fh.readline(),end='')
+            print(fh.readline(),end='')
+            print(fh.readline(),end='')
+#            (d,p)=input().rstrip().split(' ')
 else:
     print('object type must be one \"vault\",\"job\",\"archive\"')
             #print(subprocess.getoutput('aws glacier initiate-job --account-id %s --vault-name %s --job-parameters %s' % (MyAccount,argv[argv.index('--vault-name')+1],"\'{\"Type\": \"inventory-retrieval\"}\'")))
