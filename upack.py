@@ -9,10 +9,10 @@ opt=dict()
 fnl=sys.argv[1:-1]
 fnl.append(sys.argv[-1])
 
-for x in fnl:
-    if x == '--verbose': continue
+for fn in fnl:
+    if fn == '--verbose': continue
     #fn=sys.argv[1]
-    fn='20180211.071103.meta'
+    #fn='20180211.071103.meta'
     print('# processing.. ',fn)
     
     (fh,fs)=(open(fn,'rb'),os.path.getsize(fn))
