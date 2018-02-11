@@ -44,7 +44,7 @@ opt['JobId']=t
 if argv[0] == 'bucket' or argv[0] == 'vault':
     if argv[1] == 'ls':
         if not opt['Verbose']:print("#sid #name")
-        else: print("#sid archive size name")
+        else: print("#sid  arch size(GB)  name")
         jvault=json.loads(subprocess.getoutput(('aws glacier list-vaults --account-id %s' % MyAccount)))
         cnt=0
         for m in jvault['VaultList']:
@@ -52,7 +52,7 @@ if argv[0] == 'bucket' or argv[0] == 'vault':
             cnt = cnt+1
             print((m['ShortName']+' '),end='')
             if opt['Verbose']:
-                  print(" %5d %7.3f GB " % (m['NumberOfArchives'],m['SizeInBytes']/1024/1024/1024),end='')
+                  print("%5d %8.3f " % (m['NumberOfArchives'],m['SizeInBytes']/1024/1024/1024),end='')
             print(m['VaultName'])
         fh=open('.glaws.vault.json','w')
         json.dump(jvault,fp=fh)
@@ -100,11 +100,15 @@ elif argv[0] == 'job':
             'aws glacier describe-job --account-id %s --vault-name %s --job-id %s'
             % (MyAccount,opt['VaultName'],opt['JobId']))))
     elif argv[1] == 'get':
+        if opt['JobId'] == '@None@':
+            print('error, job id is neede')
+            exit(1)
         if opt['FileName'] == '@None@':
             for i in range(0,10000):
                 opt['FileName']=('log/glaws.%3.3X.output' % i)
                 if not os.path.exists(opt['FileName']):break
-        
+
+        print('## output to',opt['FileName'])
         t0 = datetime.now()
         r=subprocess.getoutput(
             'aws glacier get-job-output --account-id %s --vault-name %s --job-id %s %s'
@@ -126,7 +130,7 @@ elif argv[0] == 'job':
         fh.write('\n')
         fh.close()
     else:
-        print('option for job is \"ls\" or \"describe\"')
+        print('error, option for job is \"ls\" or \"describe\"')
 elif argv[0] == 'archieve' or argv[0] == 'arch':
     if argv[1] == 'submit-ls':
         if opt['VaultName'] != '@None@':
@@ -138,7 +142,7 @@ elif argv[0] == 'archieve' or argv[0] == 'arch':
             exit(1)
     elif argv[1] == 'cache-ls':
         if opt['FileName'] == '@None@':
-            print('--file-name is needed')
+            print('error, --file-name is needed')
         else:
             fh=open(opt['FileName'],'r')
             jo=json.load(fh)
@@ -153,7 +157,7 @@ elif argv[0] == 'archieve' or argv[0] == 'arch':
                         dsc=n[1].replace('@2',' ').replace('@1',':')+' '+n[2].replace('@3','/').replace('@2',' ').replace('@1',':').replace('@0','@')
                 print(('%s %7.3fG %s' % (m['CreationDate'],int(m['Size'])/1024/1024/1024,dsc)))
     else:    
-        print('option for archive is \"submit-ls\" or \"describe\"')
+        print('error, option for archive is \"submit-ls\" or \"describe\"')
         
 elif argv[0] == 'config' or argv[0] == 'conf':
     if argv[1] == 'region':
