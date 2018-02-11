@@ -1,62 +1,53 @@
-import os.path,json,random,sys
-import hashlib
-from Crypto.Cipher import AES
+import os.path,json,sys
+#import hashlib
 from random import randrange
 from datetime import datetime
 from treehash import TreeHash
 
-cs=1024*1024*256
-css=1024*1024*16
-csh=1024*16
-fn=sys.argv[1]
-print(fn)
-#fn='/cygdrive/d/Cloud/tmpZZ'
-fm=datetime.now().strftime('%Y%m%d.%H%M%S.meta')
-fkey=fm[0:16]
-fs=os.path.getsize(fn)
+from keygen import *
 
-meta=dict()
-meta['FileName'] = fn
-meta['Size'] = fs
-meta['CTime']=os.path.getctime(fn)
-meta['DTime']=fm
-aes=AES.new (fkey, AES.MODE_CBC, 'This is an IV456')
-mt=TreeHash()
+opt=dict()
+(cs,css,csh,csd,opt['Verbose'])=(1024*1024*256,1024*1024*16,1024*16,10,('--verbose' in sys.argv))
+rt=int('1'+'0'*(csd+1))
 
-fh=open(fn,'rb')
-fw=open(fm+'.tmp','wb')
+fnl=sys.argv[1:-1]
+fnl.append(sys.argv[-1])
 
-fb=fh.read(css)
-mt.update(fb)
-meta['ShortCRC'] = mt.hexdigest()
-fw.write(aes.encrypt(fb))
+for fn in fnl:
+    if fn == '--verbose': continue
+    #fn='Soft Book/Books/Novel Japanese/役員室午後三時 - 城山 三郎.pdf'
+    print('# processing.. ',fn)
+    (fs,fm)=(os.path.getsize(fn),datetime.now().strftime('%Y%m%d.%H%M%S.meta'))
+    if opt['Verbose']: print('## formatting to.. ',fm)
 
-for x in range(css,fs,cs):
-    fb=fh.read(cs)
+    (mt,enc)=(TreeHash(),EncMethod(fm))
+    (fh,fw)=(open(fn,'rb'),open(fm+'.tmp','wb'))
+
+    fb=fh.read(css)
     mt.update(fb)
-    fl=int((len(fb)+15)/16)*16
-    fe=aes.encrypt((fb+b'@'*16)[0:fl])
-    fw.write(fe)
-fh.close()
-fw.close()
-meta['LongCRC'] = mt.hexdigest()
-print("longcrs",meta['LongCRC'])
-print("pre cal","5b5087b45a90bf7e5e7d4e57795aaac5893d57d2b274f5b450c3de082e5a7236")
-fh=open('.spar.log','a')
+    fw.write(enc.encrypt(fb))
+    meta={'FileName':fn,'Size':fs,'CTime':os.path.getctime(fn),'DTime':fm,'ShortCRC':mt.hexdigest()}
 
-fbj=json.dumps(meta)
-fh=open('.spar.log','a');fh.write(fbj);fh.write('\n');fh.close()
+    for x in range(css,fs,cs):
+        fb=fh.read(cs)
+        mt.update(fb)
+        fw.write(enc.encrypt((fb+b'@'*16)[0:int((len(fb)+15)/16)*16]))
+    fh.close()
+    fw.close()
+    meta['LongCRC'] = mt.hexdigest()
+    if opt['Verbose']: print("## longcrs",meta['LongCRC'])
 
-fb=('%d           ' % len(fbj))[0:10]+fbj+' '
-for i in range(0,10000):
-    fb=fb+('%10.10d' % randrange(0,1000000000))
-#print(len(fb[0:csh]))
-fe=AES.new (fkey, AES.MODE_CBC, 'This is an IV456').encrypt(fb[0:csh])
-fw=open(fm,"wb")
-fw.write(fe)
-fh=open(fm+'.tmp','rb')
-for x in range(0,100):
-    fw.write(fh.read(cs))
-fh.close()
-fw.close()
+    fbj=json.dumps(meta)
+    fh=open('.spar.log','a');fh.write(fbj);fh.write('\n');fh.close()
+
+    (fh,fw)=(open(fm+'.tmp','rb'),open(fm,"wb"))
+
+    fb=('%d           ' % len(fbj))[0:csd]+fbj+' '
+    for i in range(0,int(csh/10)+1): fb=fb+('%*.*d' % (csd,csd,randrange(0,rt)))
+    fw.write(DecMethod(fm).encrypt(fb[0:csh]))
+
+    for x in range(0,fs,cs): fw.write(fh.read(cs))
+    fh.close()
+    fw.close()
+    os.remove(fm+'.tmp')
 
