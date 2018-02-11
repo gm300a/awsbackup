@@ -15,9 +15,8 @@ fnl.append(sys.argv[-1])
 
 for fn in fnl:
     if fn == '--verbose': continue
-    #fn='Soft Book/Books/Novel Japanese/役員室午後三時 - 城山 三郎.pdf'
-    print('# processing.. ',fn)
     (fs,fm)=(os.path.getsize(fn),datetime.now().strftime('%Y%m%d.%H%M%S.meta'))
+    print('# processing.. ',fn)
     if opt['Verbose']: print('## formatting to.. ',fm)
 
     (mt,enc)=(TreeHash(),EncMethod(fm))
@@ -25,6 +24,8 @@ for fn in fnl:
 
     fb=fh.read(css)
     mt.update(fb)
+    if fs <= css:
+        fb=(fb+b'@'*16)[0:int((len(fb)+15)/16)*16]
     fw.write(enc.encrypt(fb))
     meta={'FileName':fn,'Size':fs,'CTime':os.path.getctime(fn),'DTime':fm,'ShortCRC':mt.hexdigest()}
 
@@ -36,7 +37,10 @@ for fn in fnl:
     fw.close()
     meta['LongCRC'] = mt.hexdigest()
     if opt['Verbose']: print("## longcrs",meta['LongCRC'])
-
+    if fs < css and meta['ShortCRC'] != meta['LongCRC']:
+        print('## short ',meta['ShortCRC'])
+        print('## long  ',meta['LongCRC'])
+        
     fbj=json.dumps(meta)
     fh=open('.spar.log','a');fh.write(fbj);fh.write('\n');fh.close()
 
