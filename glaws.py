@@ -23,18 +23,14 @@ awstmp='aws glacier {} --account-id '+opt['Account']
 jvault=dict()
 t = '@None@' if not '--vault-name' in argv else argv[argv.index('--vault-name')+1]
 if os.path.exists('.glaws.vault.json'):
-    fh=open('.glaws.vault.json','r')
-    jvault=json.load(fh)
-    fh.close()
+    with open('.glaws.vault.json','r') as fh: jvault=json.load(fh)
     for m in jvault['VaultList']:
         if 'ShortName' in m and m['ShortName'] == t: t=m['VaultName']
 opt['VaultName']=t
 jjob=dict()
 t = '@None@' if not '--job-id' in argv else argv[argv.index('--job-id')+1]
 if os.path.exists('.glaws.job.json'):
-    fh=open('.glaws.job.json','r')
-    jjob=json.load(fh)
-    fh.close()
+    with open('.glaws.job.json','r') as fh:jjob=json.load(fh)
     for m in jjob['JobList']:
         if not 'ShortId' in m or m['ShortId'] != t:continue
         t=m['JobId']
@@ -59,9 +55,7 @@ if argv[0] == 'bucket' or argv[0] == 'vault':
             if opt['Verbose']:
                   print("%5d %8.3f " % (m['NumberOfArchives'],m['SizeInBytes']/1024/1024/1024),end='')
             print(m['VaultName'])
-        fh=open('.glaws.vault.json','w')
-        json.dump(jvault,fp=fh)
-        fh.close()
+        with open('.glaws.vault.json','w') as fh:json.dump(jvault,fp=fh)
     elif argv[1] == 'describe' or argv[1] == 'des':
         (s,r)=subprocess.getstatusoutput(\
             'aws glacier describe-vault --account-id {} --vault-name {}'.format(opt['Account'],opt['VaultName']))
@@ -91,9 +85,7 @@ elif argv[0] == 'job':
                 else:
                     print("%s %s %s %s %s" % (m['ShortId'],m['Action'],m['CreationDate'],m['CompletionDate'],s))
                 cnt = cnt+1
-        fh=open('.glaws.job.json','w')
-        json.dump(jjob,fp=fh)
-        fh.close()
+        with open('.glaws.job.json','w') as fh:json.dump(jjob,fp=fh)
     elif argv[1] == 'describe' or argv[1] == 'des':
         if opt['VaultName'] == '@None@' or opt['JobId'] == '@None': print('error, --vault-name is needed')
         (s,r)=subprocess.getoutput(awstmp.format('describe-job')+' --vault-name {}'.format(opt['VaultName'])+\
@@ -101,9 +93,7 @@ elif argv[0] == 'job':
         if s != 0: errorexit(r)
         print(json.loads(r))
     elif argv[1] == 'get':
-        if opt['JobId'] == '@None@' or opt['VaultName'] == '@None@' :
-            print('error, job id is needed')
-            exit(1)
+        if opt['JobId'] == '@None@' or opt['VaultName'] == '@None@' : errorexit('error, job id is needed')
         if opt['FileName'] == '@None@':
             for i in range(0,10000):
                 opt['FileName']=('log/glaws.%3.3X.output' % i)
@@ -126,10 +116,9 @@ elif argv[0] == 'job':
             if opt['JobId'] == m['JobId'] and 'ArchiveSizeInBytes' in m:
                 jo['GetOps']['Size'] = m['ArchiveSizeInBytes']
                 
-        fh=open('.glaws.getjob.log','a')
-        json.dump(jo,fp=fh)
-        fh.write('\n')
-        fh.close()
+        with open('.glaws.getjob.log','a') as fh:
+            json.dump(jo,fp=fh)
+            fh.write('\n')
     else:
         print('error, option for job is \"ls\" or \"describe\"')
 elif argv[0] == 'archieve' or argv[0] == 'arch':
@@ -192,9 +181,7 @@ elif argv[0] == 'archieve' or argv[0] == 'arch':
            ' --vault-name {}'.format(opt['VaultName'])
 #        print(a)
         (s,r)=subprocess.getstatusoutput(a)
-        if s != 0 :
-            print(r)
-            exit(1)
+        if s != 0 : errorexit(r)
         print(r)
     else: errorexit('error, option for archive is \"submit-ls\" or \"describe\"')
         
