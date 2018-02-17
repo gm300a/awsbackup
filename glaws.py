@@ -16,10 +16,14 @@ opt={'Account':MyAccount,
      'Description':'@None@' if not '--description' in argv else argv[argv.index('--description')+1],\
      'FileName':'@None@' if not '--file-name' in argv else argv[argv.index('--file-name')+1],\
      'ArchiveID':'@None@' if not '--arch-id' in argv else argv[argv.index('--arch-id')+1],\
-     'Range':0 if not '--header' in argv else 1024*1024,\
+     'Range':0 if not '--header' in argv else 1024*1024-1,\
+     'Full':('--full-length' in argv),\
      'Verbose':('--verbose' in argv),'ShowId':('--show-id' in argv),\
      'HumanRead':('-h' in argv or '--human-readable' in argv)}
 awstmp='aws glacier {} --account-id '+opt['Account']
+if not opt['Full'] and opt['Range'] == 0:
+    opt['Range'] = 1024*1024
+    
 jvault=dict()
 t = '@None@' if not '--vault-name' in argv else argv[argv.index('--vault-name')+1]
 if os.path.exists('.glaws.vault.json'):
@@ -176,13 +180,17 @@ elif argv[0] == 'archieve' or argv[0] == 'arch':
         jpar={'Type' : 'archive-retrieval', 'ArchiveId' : opt['ArchiveID'],'Tier' : 'Bulk', 'Description' : opt['Description']}
         if opt['Range'] != 0:
             jpar['RetrievalByteRange'] = '{}-{}'.format(0,opt['Range'])
+            if 1024*1024*128 < opt['Range']: r='{:.3}G'.format(opt['Range']/1024/1024/1024)
+            elif 1028*128 < opt['Range']: r='{:.3f}M'.format(opt['Range']/1024/1024)
+            print('## range applied {}Byte'.format(r))
         a=awstmp.format('initiate-job')+\
            ' --job-parameters \'{}\''.format(json.dumps(jpar))+\
            ' --vault-name {}'.format(opt['VaultName'])
-#        print(a)
+        print(a)
+        exit(1)
         (s,r)=subprocess.getstatusoutput(a)
         if s != 0 : errorexit(r)
-        print(r)
+        if opt['Verbose']:print('## jobs id is {}'.format(r['JObId']))
     else: errorexit('error, option for archive is \"submit-ls\" or \"describe\"')
         
 elif argv[0] == 'config' or argv[0] == 'conf':

@@ -1,8 +1,0 @@
-# -*- shell-script -*-
-source ./cdbackup.py
-#JOBID="n7srWU937x6ECe1QZejByoGS0cygMSCZsNKvjLUTZk6c1BGWCNb2JeKTaotAvIH3_nI5TLJmavDKv5vZ3uX5HYPeto5p"
-
-#aws glacier list-jobs      --account-id $MyAccount --vault-name $MyVault
-aws glacier describe-job --account-id $MyAccount --vault-name $MyVault --job-id $JOBID
-aws glacier get-job-output --account-id $MyAccount --vault-name $MyVault --job-id $JOBID arclist.1.txt
-#echo $MyAccount
