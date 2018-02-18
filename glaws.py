@@ -18,11 +18,17 @@ opt={'Account':MyAccount,
      'ArchiveID':'@None@' if not '--arch-id' in argv else argv[argv.index('--arch-id')+1],\
      'Range':0 if not '--header' in argv else 1024*1024-1,\
      'Full':('--full-length' in argv),\
+     'V3File':('--v3-file-name' in argv or '-v3' in argv),\
      'Verbose':('--verbose' in argv),'ShowId':('--show-id' in argv),\
      'HumanRead':('-h' in argv or '--human-readable' in argv)}
+if '--range-test' in argv:
+    opt['Range'] = int(argv[argv.index('--range-test')+1])
 awstmp='aws glacier {} --account-id '+opt['Account']
 if not opt['Full'] and opt['Range'] == 0:
-    opt['Range'] = 1024*1024
+    opt['Range'] = 1024*1024-1
+if opt['Range'] != 0 and (opt['Range']+1) % 1024*1024 != 0:
+    opt['Range'] = int((opt['Range']+1024*1024-1)/1024/1024)*1024*1024-1
+    print('# range is aligned to MB boundary,{}'.format(opt['Range']))
     
 jvault=dict()
 t = '@None@' if not '--vault-name' in argv else argv[argv.index('--vault-name')+1]
@@ -38,6 +44,7 @@ if os.path.exists('.glaws.job.json'):
     for m in jjob['JobList']:
         if not 'ShortId' in m or m['ShortId'] != t:continue
         t=m['JobId']
+        opt['JobDescription'] = m['JobDescription']
         if not ('VaultName' in m):continue
         if not ('VaultName' in opt) or opt['VaultName'] != '@None@' : continue
         opt['VaultName'] = m['VaultName']
@@ -98,12 +105,20 @@ elif argv[0] == 'job':
         print(json.loads(r))
     elif argv[1] == 'get':
         if opt['JobId'] == '@None@' or opt['VaultName'] == '@None@' : errorexit('error, job id is needed')
-        if opt['FileName'] == '@None@':
+        if opt['FileName'] != '@None@':
+            pass
+        elif opt['V3File'] and 'JobDescription' in opt:
+            n = opt['JobDescription'].split('/')
+            if n[0] != 'v3' :errorexit('description is not a V3 format({})'.format(opt['JobDescription']))
+            #fn=n[2].replace('@3','/').replace('@2',' ').replace('@1',':').replace('@0','@')
+            opt['FileName'] = n[2]
+        else:
             for i in range(0,10000):
                 opt['FileName']=('log/glaws.%3.3X.output' % i)
                 if not os.path.exists(opt['FileName']):break
 
         print('## output to',opt['FileName'])
+#        exit(1)
         t0 = datetime.now()
         (s,r)=subprocess.getstatusoutput(
             'aws glacier get-job-output --account-id {} --vault-name {} '.format(opt['Account'],opt['VaultName']) +
@@ -128,10 +143,16 @@ elif argv[0] == 'job':
 elif argv[0] == 'archieve' or argv[0] == 'arch':
     if argv[1] == 'submit-ls':
         if opt['VaultName'] == '@None@': errorexit('error, --vault-name is needed')
-        (s,r)=subprocess.getoutput(awstmp.format('initiate-job')+' --vault-name {}'.format(opt['VaultName'])+\
-                                   ' --job-parameters {}'.format("\'{\"Type\": \"inventory-retrieval\"}\'"))
+        jpar=dict({'Type':'inventory-retrieval'})
+        print(\
+            awstmp.format('initiate-job')+' --vault-name {}'.format(opt['VaultName'])+\
+            ' --job-parameters \'{}\''.format(json.dumps(jpar)))
+        (s,r)=subprocess.getstatusoutput(\
+            awstmp.format('initiate-job')+' --vault-name {}'.format(opt['VaultName'])+\
+            ' --job-parameters \'{}\''.format(json.dumps(jpar)))
         if s != 0 :errorexit(r)
-        print(json.loads(r))
+        jo=json.loads(r)
+        print('# job id {}'.format(jo['jobId']))
     elif argv[1] == 'cache-ls':
         if opt['FileName'] == '@None@': errorexit('error, --file-name is needed')
         with open(opt['FileName'],'r') as fh: jo=json.load(fh)
@@ -176,8 +197,8 @@ elif argv[0] == 'archieve' or argv[0] == 'arch':
                     break
             if len(opt['ArchiveID']) < 10:
                 errorexit('error, Archive ID too short or incorrect ({})'.format(opt['ArchiveID']))
-        jpar=dict()
-        jpar={'Type' : 'archive-retrieval', 'ArchiveId' : opt['ArchiveID'],'Tier' : 'Bulk', 'Description' : opt['Description']}
+        jpar=dict({'Type' : 'archive-retrieval', 'ArchiveId' : opt['ArchiveID'],'Tier' : 'Bulk',\
+                   'Description' : opt['Description']})
         if opt['Range'] != 0:
             jpar['RetrievalByteRange'] = '{}-{}'.format(0,opt['Range'])
             if 1024*1024*128 < opt['Range']: r='{:.3}G'.format(opt['Range']/1024/1024/1024)
@@ -187,7 +208,7 @@ elif argv[0] == 'archieve' or argv[0] == 'arch':
            ' --job-parameters \'{}\''.format(json.dumps(jpar))+\
            ' --vault-name {}'.format(opt['VaultName'])
         print(a)
-        exit(1)
+#        exit(1)
         (s,r)=subprocess.getstatusoutput(a)
         if s != 0 : errorexit(r)
         if opt['Verbose']:print('## jobs id is {}'.format(r['JObId']))
