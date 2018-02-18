@@ -44,10 +44,9 @@ if os.path.exists('.glaws.job.json'):
     for m in jjob['JobList']:
         if not 'ShortId' in m or m['ShortId'] != t:continue
         t=m['JobId']
-        opt['JobDescription'] = m['JobDescription']
-        if not ('VaultName' in m):continue
-        if not ('VaultName' in opt) or opt['VaultName'] != '@None@' : continue
-        opt['VaultName'] = m['VaultName']
+        if 'JobDescription' in m: opt['JobDescription'] = m['JobDescription']
+        if 'VaultName' in m and (not ('VaultName' in opt) or opt['VaultName'] == '@None@') :
+            opt['VaultName'] = m['VaultName']
 opt['JobId']=t
 #print(opt['VaultName'])
 #print(opt['JobId'])
@@ -68,34 +67,30 @@ if argv[0] == 'bucket' or argv[0] == 'vault':
             print(m['VaultName'])
         with open('.glaws.vault.json','w') as fh:json.dump(jvault,fp=fh)
     elif argv[1] == 'describe' or argv[1] == 'des':
-        (s,r)=subprocess.getstatusoutput(\
-            'aws glacier describe-vault --account-id {} --vault-name {}'.format(opt['Account'],opt['VaultName']))
+        (s,r)=subprocess.getstatusoutput(
+            awstmp.format('describe-vault')+\
+            ' --vault-name {}'.format(opt['VaultName']))
         print(r)
     else: errorexit('option for vault is \"ls\" or \"describe\"')
 
 elif argv[0] == 'job':
     if argv[1] == 'ls':
         if opt['VaultName'] == '@None@': errorexit('error,--vault-name is needed')
-        cnt=0
+        (s,r)=subprocess.getstatusoutput(
+            awstmp.format('list-jobs')+' --vault-name {}'.format(opt['VaultName']))
+        if s != 0: errorexit(r)
         jjob=dict()
-        for v in jvault['VaultList']: ## multi vault code is not completed.
-            if opt['VaultName'] != v['VaultName'] and opt['VaultName'] != '@ALL@': continue
-            #print(('# vault %s is under scan' % v['VaultName']))
-            (s,r)=subprocess.getstatusoutput(
-                'aws glacier list-jobs --account-id {} --vault-name {}'.format(opt['Account'],v['VaultName']))
-            if s != 0: errorexit(r)
-            jjob=json.loads(r)
-            for m in jjob['JobList']:
-                m['ShortId'] = ("@J%2.2x" % cnt)
-                m['VaultName'] = v['VaultName']
-                s = re.sub('^.*?:vaults/','',m['VaultARN'])
-                if not opt['Verbose'] :
-                    print("%s %s %s %s" % (m['ShortId'],m['Action'],m['StatusCode'],s))
-                elif not m['Completed']:
-                    print("%s %s %s %s %s" % (m['ShortId'],m['Action'],m['CreationDate'],m['StatusCode'],s))
-                else:
-                    print("%s %s %s %s %s" % (m['ShortId'],m['Action'],m['CreationDate'],m['CompletionDate'],s))
-                cnt = cnt+1
+        jjob=json.loads(r)
+        cnt=0
+        for m in jjob['JobList']:
+            m['ShortId'] = ("@J%2.2x" % cnt)
+            m['VaultName'] = opt['VaultName']
+            s = re.sub('^.*?:vaults/','',m['VaultARN'])
+            print("%s %s " % (m['ShortId'],m['Action']),end='')
+            if not opt['Verbose'] :  print("%s %s" % (m['StatusCode'],s))
+            elif not m['Completed']: print("%s %s %s" % (m['CreationDate'],m['StatusCode'],s))
+            else:                    print("%s %s %s" % (m['CreationDate'],m['CompletionDate'],s))
+            cnt = cnt+1
         with open('.glaws.job.json','w') as fh:json.dump(jjob,fp=fh)
     elif argv[1] == 'describe' or argv[1] == 'des':
         if opt['VaultName'] == '@None@' or opt['JobId'] == '@None': print('error, --vault-name is needed')
