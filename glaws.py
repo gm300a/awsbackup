@@ -86,10 +86,10 @@ elif argv[0] == 'job':
             m['ShortId'] = ("@J%2.2x" % cnt)
             m['VaultName'] = opt['VaultName']
             s = re.sub('^.*?:vaults/','',m['VaultARN'])
-            print("%s %s " % (m['ShortId'],m['Action']),end='')
-            if not opt['Verbose'] :  print("%s %s" % (m['StatusCode'],s))
-            elif not m['Completed']: print("%s %s %s" % (m['CreationDate'],m['StatusCode'],s))
-            else:                    print("%s %s %s" % (m['CreationDate'],m['CompletionDate'],s))
+            print("{} {:20} ".format(m['ShortId'],m['Action']),end='')
+            if not opt['Verbose'] :  print("%-25s %s" % (m['StatusCode'],s))
+            elif not m['Completed']: print("%-25s %-25s %s" % (m['CreationDate'],m['StatusCode'],s))
+            else:                    print("%-25s %-25s %s" % (m['CreationDate'],m['CompletionDate'],s))
             cnt = cnt+1
         with open('.glaws.job.json','w') as fh:json.dump(jjob,fp=fh)
     elif argv[1] == 'describe' or argv[1] == 'des':
