@@ -19,6 +19,7 @@ def cmd(a):
         (s,r)=subprocess.getstatusoutput(a)
         if s != 0:
             print('## status code ...{0:<3}'.format(s))
+            print('## {}'.format(r))
             print('## {}'.format(a))
         return(s,r)
 
@@ -28,20 +29,18 @@ from useast1 import *
 (cs,css,csh,csd)=(1024*1024*256,1024*1024*16,1024*16,10)
 
 argv=sys.argv[1:]
-opt={'Account':MyAccount,
-     'Verbose':('--verbose' in sys.argv)}
-opt['VaultName'] = MyVault
- #    'VaultName':'@None@' if not '--vault-name' in argv else argv[argv.index('--vault-name')+1]}
+opt={'Account': MyAccount, 'VaultName': MyVault,'Verbose': ('--verbose' in sys.argv),
+     'Move2tmp': ('--move-to-tmp' in sys.argv) and os.path.exists('tmp') and os.path.isdir('tmp')}
 
-#     'FileName':'@None@' if not '--file-name' in argv else argv[argv.index('--file-name')+1],
+if opt['Move2tmp'] : print('# when the upload is completed, file is moved to ./tmp/.')
 
 awstmp='aws glacier {} --account-id '+opt['Account']
-
 flog=open('.up2val.file.log','a')
 #exit(1)
 for fn in sys.argv[1:]:
-    print('# target file:'+fn)
-    print('# target file:'+fn,file=flog,flush=True)
+    if fn == '--verbose' or fn == '--move-to-tmp' : continue
+    print('# target file: '+fn)
+    print('# target file: '+fn,file=flog,flush=True)
     (fs,cs,ft,mt,cn)=(os.path.getsize(fn),csize,open(fn,'rb'),TreeHash(),0)
     print(('## chunk size :%.3f Gb' % (int(cs)/1024/1024/1024)))
     for x in range(0,fs,cs):
@@ -67,7 +66,7 @@ for fn in sys.argv[1:]:
         fp='tmp{:0=2}'.format(cn)
         fr=open(fp,'rb') ;rs=fr.read(cs) ;fr.close()
         mp=TreeHash();mp.update(rs);fl=len(rs)
-        
+
         (s,r)=cmd(awstmp.format('upload-multipart-part')+' --vault-name {}'.format(opt['VaultName'])+\
            ' --body \'{}\' --upload-id {}'.format(fp,upid)+\
            ' --range \"bytes {}-{}/*\" --checksum \"{}\"'.format(rp,rp+fl-1,mp.hexdigest()))
@@ -76,14 +75,14 @@ for fn in sys.argv[1:]:
             print('##  done part {:2}, {:6.2f} Gb ({:12} b)'.format(cn,fl/1024/1024/1024.,fl),flush=True)
         elif cn == 0 : print('##  done part {:2}'.format(cn),end='',flush=True)
         else: print(' {:2}'.format(cn),end='',flush=True)
-        cn=cn+1
-        rp=rp+fl
+        (rp,cn)=(rp+fl,cn+1)
         fr.close()
 
     print('')
     (s,r)=cmd(awstmp.format('complete-multipart-upload')+' --vault-name {}'.format(opt['VaultName'])+\
               ' --upload-id {} --checksum \"{}\"  --archive-size {}'.format(upid,mt.hexdigest(),fs))
     if s != 0:errorexit(r)
-    #print(r)
     print('##  done {}'.format(upid))
     print('##  done {}'.format(upid),file=flog,flush=True)
+    if opt['Move2tmp'] and os.path.exists('tmp'):
+        os.rename(fn,'tmp/{}'.format(fn))
