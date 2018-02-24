@@ -17,7 +17,6 @@ def cmd(a):
         return ('--debug mode--')
     else:
         (s,r)=subprocess.getstatusoutput(a)
-        print('## status code ...Z>>{0:<3}<<Z'.format(s))
         if s != 0:
             print('## status code ...{0:<3}'.format(s))
             print('## {}'.format(a))
@@ -47,7 +46,7 @@ for fn in sys.argv[1:]:
     print(('## chunk size :%.3f Gb' % (int(cs)/1024/1024/1024)))
     for x in range(0,fs,cs):
         rs=ft.read(cs)
-        fw=open(('tmp%2.2d' % cn),'wb') ;fw.write(rs) ;fw.close()
+        fw=open('tmp{:0=2d}'.format(cn),'wb') ;fw.write(rs) ;fw.close()
         mt.update(rs);
         cn=cn+1
     ft.close()
@@ -65,24 +64,26 @@ for fn in sys.argv[1:]:
 
     (rp,cn)=(0,0)
     for x in range(0,fs,cs):
-        fr=open(('tmp%2.2d' % cn),'rb') ;rs=fr.read(cs) ;fr.close()
+        fp='tmp{:0=2}'.format(cn)
+        fr=open(fp,'rb') ;rs=fr.read(cs) ;fr.close()
         mp=TreeHash();mp.update(rs);fl=len(rs)
         
-        a=awstmp.format('upload-multipart-part')+' --vault-name {}'.format(opt['VaultName'])+\
-           ' --body \'{}\' --upload-id {}'.format(('tmp%2.2d' % cn),upid)+\
-           ' --range \"bytes %d-%d/*\" --checksum \"%s\"' % (rp,rp+fl-1,mp.hexdigest())
-#        print(a)
-        (s,r)=subprocess.getstatusoutput(a)
+        (s,r)=cmd(awstmp.format('upload-multipart-part')+' --vault-name {}'.format(opt['VaultName'])+\
+           ' --body \'{}\' --upload-id {}'.format(fp,upid)+\
+           ' --range \"bytes {}-{}/*\" --checksum \"{}\"'.format(rp,rp+fl-1,mp.hexdigest()))
         if s != 0:errorexit(r)
-        print(('#   done part %2d, %6.3f Gb (%12d b)' % (cn,fl/1024/1024/1024.,fl)),flush=True)
+        if opt['Verbose'] :
+            print('##  done part {:2}, {:6.2f} Gb ({:12} b)'.format(cn,fl/1024/1024/1024.,fl),flush=True)
+        elif cn == 0 : print('##  done part {:2}'.format(cn),end='',flush=True)
+        else: print(' {:2}'.format(cn),end='',flush=True)
         cn=cn+1
         rp=rp+fl
         fr.close()
 
-    a=awstmp.format('complete-multipart-upload')+' --vault-name {}'.format(opt['VaultName'])+\
-       ' --upload-id {} --checksum \"{}\"  --archive-size {}'.format(upid,mt.hexdigest(),fs)
-    print(a)
-    (s,r)=subprocess.getstatusoutput(a)
+    print('')
+    (s,r)=cmd(awstmp.format('complete-multipart-upload')+' --vault-name {}'.format(opt['VaultName'])+\
+              ' --upload-id {} --checksum \"{}\"  --archive-size {}'.format(upid,mt.hexdigest(),fs))
     if s != 0:errorexit(r)
-    print(r)
-    #print('#  done',file=flog,flush=True)
+    #print(r)
+    print('##  done {}'.format(upid))
+    print('##  done {}'.format(upid),file=flog,flush=True)
