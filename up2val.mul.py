@@ -26,25 +26,31 @@ def cmd(a):
 # you need to set your own Account and Vault Name in local.py file
 (csize,MyAccount,MyVault)=(1024*1024*256,'Empty','Empty') # 256MB for test
 from useast1 import *
-(cs,css,csh,csd)=(1024*1024*256,1024*1024*16,1024*16,10)
 
 argv=sys.argv[1:]
 opt={'Account': MyAccount, 'VaultName': MyVault,'Verbose': ('--verbose' in sys.argv),
      'Move2tmp': ('--move-to-tmp' in sys.argv) and os.path.exists('tmp') and os.path.isdir('tmp')}
 
 if opt['Move2tmp'] : print('# when the upload is completed, file is moved to ./tmp/.')
+opt['MinSize'] = int(csize/128) if opt['Move2tmp'] else 0
+print(opt['MinSize'])
 
 awstmp='aws glacier {} --account-id '+opt['Account']
 flog=open('.up2val.file.log','a')
-#exit(1)
+print(('## chunk size : %.3f Gb' % (int(csize)/1024/1024/1024)))
 for fn in sys.argv[1:]:
     if fn == '--verbose' or fn == '--move-to-tmp' : continue
+    if not os.path.exists(fn) :
+        if opt['Verbose'] : print('## file {} cannot be accessed'.format(fn))
+        continue
+    (fs,ft,mt,cn)=(os.path.getsize(fn),open(fn,'rb'),TreeHash(),0)
+    if fs < opt['MinSize'] :
+        if opt['Verbose'] : print('## file {} is shoter than lower limit {}.'.format(fn,opt['MinSize']))
+        continue
     print('# target file: '+fn)
     print('# target file: '+fn,file=flog,flush=True)
-    (fs,cs,ft,mt,cn)=(os.path.getsize(fn),csize,open(fn,'rb'),TreeHash(),0)
-    print(('## chunk size :%.3f Gb' % (int(cs)/1024/1024/1024)))
-    for x in range(0,fs,cs):
-        rs=ft.read(cs)
+    for x in range(0,fs,csize):
+        rs=ft.read(csize)
         fw=open('tmp{:0=2d}'.format(cn),'wb') ;fw.write(rs) ;fw.close()
         mt.update(rs);
         cn=cn+1
@@ -54,7 +60,7 @@ for fn in sys.argv[1:]:
             '/'+mt.hexdigest()+'/0'
     while(1):
         (s,r)=cmd(awstmp.format('initiate-multipart-upload')+ ' --vault-name {}'.format(opt['VaultName'])+
-                  ' --archive-description \"{}\" --part-size {}'.format(arcdsc,cs))
+                  ' --archive-description \"{}\" --part-size {}'.format(arcdsc,csize))
         if s!=0 : errorexit(r)
         upid=json.loads(r)['uploadId']
         if opt['Verbose'] : print("## upload id "+upid)
@@ -62,9 +68,9 @@ for fn in sys.argv[1:]:
             break
 
     (rp,cn)=(0,0)
-    for x in range(0,fs,cs):
+    for x in range(0,fs,csize):
         fp='tmp{:0=2}'.format(cn)
-        fr=open(fp,'rb') ;rs=fr.read(cs) ;fr.close()
+        fr=open(fp,'rb') ;rs=fr.read(csize) ;fr.close()
         mp=TreeHash();mp.update(rs);fl=len(rs)
 
         (s,r)=cmd(awstmp.format('upload-multipart-part')+' --vault-name {}'.format(opt['VaultName'])+\
