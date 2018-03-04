@@ -1,7 +1,4 @@
 #! env python3
-# use like, ./up2val.py <filename> | sh
-# This program write a shell script to review the job before be submitted
-# you need to set your own Account and Vault Name in local.py file
 from datetime import datetime
 from treehash import TreeHash
 import json,os.path,re,subprocess,sys
@@ -12,8 +9,8 @@ def errorexit(msg):
 
 def logevent(msg):
     print(msg)
-    with open('.up2val.file.log','a') as fh: print(msg,file=fh,flush=True)
-    
+    with open('.up2valZ.file.log','a') as fh: print(msg,file=fh,flush=True)
+
 cmdsw = 0
 def cmd(a):
     if cmdsw == 1:
@@ -32,35 +29,39 @@ def cmd(a):
 from useast1 import *
 
 opt={'Account': MyAccount, 'VaultName': MyVault,'Verbose': ('--verbose' in sys.argv),
-     'Move2tmp': ('--move-to-tmp' in sys.argv) and os.path.exists('tmp') and os.path.isdir('tmp')}
+     'TempFile': ('' if '--no-temp' in sys.argv else os.environ.get('TMP')+'/')+\
+     'upload{:05X}{}'.format(os.getpid(),'.{:03X}.{:03X}'),
+     'Move2Done': '--move-to-done' in sys.argv and os.path.exists('done') and os.path.isdir('done')}
 
-if opt['Move2tmp'] : print('# when the upload is completed, file is moved to ./tmp/.')
-opt['MinSize'] = int(csize/128) if opt['Move2tmp'] else 0
-#print(opt['MinSize'])
+if opt['Move2Done'] : print('# when the upload is completed, file is moved to ./done/.')
+opt['MinSize'] = int(csize/128) if opt['Move2Done'] else 0
 
-awstmp='aws glacier {} --account-id '+opt['Account']
-print(('## chunk size : %.3f Gb' % (int(csize)/1024/1024/1024)))
+(fcnt,gbyte,awstmp)=(0,1024*1024*1024,'aws glacier {} --account-id '+opt['Account'])
+awstmp=awstmp+' --vault-name {}'.format(opt['VaultName'])
+print('## chunk size : {:6.2f} GB'.format(csize/gbyte))
 for fn in sys.argv[1:]:
-    if fn == '--verbose' or fn == '--move-to-tmp' : continue
-    if not os.path.exists(fn) :
+    print(fn)
+exit(1)
+for fn in sys.argv[1:]:
+    if re.match('^--',fn): continue
+    elif not os.path.exists(fn) :
         if opt['Verbose'] : print('## file {} cannot be accessed'.format(fn))
         continue
-    (fs,ft,mt,cn)=(os.path.getsize(fn),open(fn,'rb'),TreeHash(),0)
+    fs=os.path.getsize(fn)
     if fs < opt['MinSize'] :
-        if opt['Verbose'] : print('## file {} is shoter than lower limit {}.'.format(fn,opt['MinSize']))
+        if opt['Verbose'] :
+            print('## file {} is shoter than lower limit {}.'.format(fn,opt['MinSize']))
         continue
-    logevent('# target file: '+fn)
-    for x in range(0,fs,csize):
-        rs=ft.read(csize)
-        fw=open('tmp{:0=2d}'.format(cn),'wb') ;fw.write(rs) ;fw.close()
-        mt.update(rs);
-        cn=cn+1
+    (ft,mt)=(open(fn,'rb'),TreeHash())
+    logevent('#{:03} target file: {}'.format(fcnt,fn))
+    for x in range(0,fs,csize): mt.update(ft.read(csize))
     ft.close()
+
     arcdsc=datetime.now().strftime('v3/%Y-%m-%d@2%H@1%M@1%S/')+\
             fn.replace('@','@0').replace(':','@1').replace(' ','@2').replace('/','@3')+\
-            '/'+mt.hexdigest()+'/0'
+            '/'+mt.hexdigest()+'/0'    
     while(1):
-        (s,r)=cmd(awstmp.format('initiate-multipart-upload')+ ' --vault-name {}'.format(opt['VaultName'])+
+        (s,r)=cmd(awstmp.format('initiate-multipart-upload')+
                   ' --archive-description \"{}\" --part-size {}'.format(arcdsc,csize))
         if s!=0 : errorexit(r)
         upid=json.loads(r)['uploadId']
@@ -68,27 +69,27 @@ for fn in sys.argv[1:]:
         if upid[0] != '-':
             break
 
-    (rp,cn)=(0,0)
+    (rp,scnt,ft,awstmp)=(0,0,open(fn,'rb'),awstmp+' --upload-id {}'.format(upid))
     for x in range(0,fs,csize):
-        fp='tmp{:0=2}'.format(cn)
-        fr=open(fp,'rb') ;rs=fr.read(csize) ;fr.close()
-        mp=TreeHash();mp.update(rs);fl=len(rs)
+        rs=ft.read(csize);
+        (fl,fp)=(len(rs),opt['TempFile'].format(fcnt,scnt))
+        with open(fp,'wb') as fw : fw.write(rs)
+        mp=TreeHash();mp.update(rs)
 
-        (s,r)=cmd(awstmp.format('upload-multipart-part')+' --vault-name {}'.format(opt['VaultName'])+\
-           ' --body \'{}\' --upload-id {}'.format(fp,upid)+\
-           ' --range \"bytes {}-{}/*\" --checksum \"{}\"'.format(rp,rp+fl-1,mp.hexdigest()))
+        (s,r)=cmd(awstmp.format('upload-multipart-part')+' --body \'{}\''.format(fp)+\
+                  ' --range \"bytes {}-{}/*\" --checksum \"{}\"'.format(rp,rp+fl-1,mp.hexdigest()))
         if s != 0:errorexit(r)
         if opt['Verbose'] :
-            print('##  done part {:2}, {:6.2f} Gb ({:12} b)'.format(cn,fl/1024/1024/1024.,fl),flush=True)
-        elif cn == 0 : print('##  done part {:2}'.format(cn),end='',flush=True)
-        else: print(' {:2}'.format(cn),end='',flush=True)
-        (rp,cn)=(rp+fl,cn+1)
-        fr.close()
+            print('##  done part {:2}, {:6.2f} GB ({:12} b)'.format(scnt,fl/gbyte,fl), flush=True)
+        elif scnt == 0 : print('##  done part {:2}'.format(scnt),end='',flush=True)
+        else: print(' {:2}'.format(scnt),end='',flush=True)
+        (rp,scnt)=(rp+fl,scnt+1)
+        os.remove(fp)
+    ft.close()
 
     print('')
-    (s,r)=cmd(awstmp.format('complete-multipart-upload')+' --vault-name {}'.format(opt['VaultName'])+\
-              ' --upload-id {} --checksum \"{}\"  --archive-size {}'.format(upid,mt.hexdigest(),fs))
+    (s,r)=cmd(awstmp.format('complete-multipart-upload')+
+              ' --checksum \"{}\" --archive-size {}'.format(mt.hexdigest(),fs))
     if s != 0:errorexit(r)
     logevent('##  done {}'.format(upid))
-    if opt['Move2tmp'] and os.path.exists('tmp'):
-        os.rename(fn,'tmp/{}'.format(fn))
+    if opt['Move2Done'] : os.rename(fn,'done/{}'.format(fn))
