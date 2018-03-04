@@ -1,3 +1,4 @@
+#! env python3
 import os.path,json,sys
 #import hashlib
 from random import randrange
@@ -10,17 +11,16 @@ opt=dict()
 (cs,css,csh,csd,opt['Verbose'])=(1024*1024*256,1024*1024*16,1024*16,10,('--verbose' in sys.argv))
 rt=int('1'+'0'*(csd+1))
 
-fnl=sys.argv[1:-1]
-fnl.append(sys.argv[-1])
-
-for fn in fnl:
+for fn in sys.argv[1:]:
     if fn == '--verbose': continue
     (fs,fm)=(os.path.getsize(fn),datetime.now().strftime('%Y%m%d.%H%M%S.meta'))
+    ft=os.environ.get('TMP')+'/'+fm+'.tmp'
+    print('### tmp=',ft)
     print('# processing.. ',fn)
     if opt['Verbose']: print('## formatting to.. ',fm)
 
     (mt,enc)=(TreeHash(),EncMethod(fm))
-    (fh,fw)=(open(fn,'rb'),open(fm+'.tmp','wb'))
+    (fh,fw)=(open(fn,'rb'),open(ft,'wb'))
 
     fb=fh.read(css)
     mt.update(fb)
@@ -44,7 +44,7 @@ for fn in fnl:
     fbj=json.dumps(meta)
     fh=open('.spar.log','a');fh.write(fbj);fh.write('\n');fh.close()
 
-    (fh,fw)=(open(fm+'.tmp','rb'),open(fm,"wb"))
+    (fh,fw)=(open(ft,'rb'),open(fm,"wb"))
 
     fb=('%d           ' % len(fbj))[0:csd]+fbj+' '
     for i in range(0,int(csh/10)+1): fb=fb+('%*.*d' % (csd,csd,randrange(0,rt)))
@@ -53,5 +53,5 @@ for fn in fnl:
     for x in range(0,fs,cs): fw.write(fh.read(cs))
     fh.close()
     fw.close()
-    os.remove(fm+'.tmp')
+    os.remove(ft)
 
