@@ -9,7 +9,7 @@ def errorexit(msg):
 
 def logevent(msg):
     print(msg)
-    with open('.up2valZ.file.log','a') as fh: print(msg,file=fh,flush=True)
+    with open('.up2val.file.log','a') as fh: print(msg,file=fh,flush=True)
 
 cmdsw = 0
 def cmd(a):
