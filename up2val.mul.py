@@ -10,6 +10,10 @@ def errorexit(msg):
     print(msg)
     exit(1)
 
+def logevent(msg):
+    print(msg)
+    with open('.up2val.file.log','a') as fh: print(msg,file=fh,flush=True)
+    
 cmdsw = 0
 def cmd(a):
     if cmdsw == 1:
@@ -27,16 +31,14 @@ def cmd(a):
 (csize,MyAccount,MyVault)=(1024*1024*256,'Empty','Empty') # 256MB for test
 from useast1 import *
 
-argv=sys.argv[1:]
 opt={'Account': MyAccount, 'VaultName': MyVault,'Verbose': ('--verbose' in sys.argv),
      'Move2tmp': ('--move-to-tmp' in sys.argv) and os.path.exists('tmp') and os.path.isdir('tmp')}
 
 if opt['Move2tmp'] : print('# when the upload is completed, file is moved to ./tmp/.')
 opt['MinSize'] = int(csize/128) if opt['Move2tmp'] else 0
-print(opt['MinSize'])
+#print(opt['MinSize'])
 
 awstmp='aws glacier {} --account-id '+opt['Account']
-flog=open('.up2val.file.log','a')
 print(('## chunk size : %.3f Gb' % (int(csize)/1024/1024/1024)))
 for fn in sys.argv[1:]:
     if fn == '--verbose' or fn == '--move-to-tmp' : continue
@@ -47,8 +49,7 @@ for fn in sys.argv[1:]:
     if fs < opt['MinSize'] :
         if opt['Verbose'] : print('## file {} is shoter than lower limit {}.'.format(fn,opt['MinSize']))
         continue
-    print('# target file: '+fn)
-    print('# target file: '+fn,file=flog,flush=True)
+    logevent('# target file: '+fn)
     for x in range(0,fs,csize):
         rs=ft.read(csize)
         fw=open('tmp{:0=2d}'.format(cn),'wb') ;fw.write(rs) ;fw.close()
@@ -88,7 +89,6 @@ for fn in sys.argv[1:]:
     (s,r)=cmd(awstmp.format('complete-multipart-upload')+' --vault-name {}'.format(opt['VaultName'])+\
               ' --upload-id {} --checksum \"{}\"  --archive-size {}'.format(upid,mt.hexdigest(),fs))
     if s != 0:errorexit(r)
-    print('##  done {}'.format(upid))
-    print('##  done {}'.format(upid),file=flog,flush=True)
+    logevent('##  done {}'.format(upid))
     if opt['Move2tmp'] and os.path.exists('tmp'):
         os.rename(fn,'tmp/{}'.format(fn))
