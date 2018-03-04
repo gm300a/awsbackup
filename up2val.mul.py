@@ -66,14 +66,14 @@ for fn in sys.argv[1:]:
         if upid[0] != '-':
             break
 
-    (rp,scnt,ft,awstmp)=(0,0,open(fn,'rb'),awstmp+' --upload-id {}'.format(upid))
+    (rp,scnt,ft,awsids)=(0,0,open(fn,'rb'),awstmp+' --upload-id {}'.format(upid))
     for x in range(0,fs,csize):
         rs=ft.read(csize);
         (fl,fp)=(len(rs),opt['TempFile'].format(fcnt,scnt))
         with open(fp,'wb') as fw : fw.write(rs)
         mp=TreeHash();mp.update(rs)
 
-        (s,r)=cmd(awstmp.format('upload-multipart-part')+' --body \'{}\''.format(fp)+\
+        (s,r)=cmd(awsids.format('upload-multipart-part')+' --body \'{}\''.format(fp)+\
                   ' --range \"bytes {}-{}/*\" --checksum \"{}\"'.format(rp,rp+fl-1,mp.hexdigest()))
         if s != 0:errorexit(r)
         if opt['Verbose'] :
@@ -85,8 +85,9 @@ for fn in sys.argv[1:]:
     ft.close()
 
     print('')
-    (s,r)=cmd(awstmp.format('complete-multipart-upload')+
+    (s,r)=cmd(awsids.format('complete-multipart-upload')+
               ' --checksum \"{}\" --archive-size {}'.format(mt.hexdigest(),fs))
     if s != 0:errorexit(r)
     logevent('##  done {}'.format(upid))
     if opt['Move2Done'] : os.rename(fn,'done/{}'.format(fn))
+    fcnt=fcnt+1
