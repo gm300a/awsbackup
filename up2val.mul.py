@@ -40,9 +40,6 @@ opt['MinSize'] = int(csize/128) if opt['Move2Done'] else 0
 awstmp=awstmp+' --vault-name {}'.format(opt['VaultName'])
 print('## chunk size : {:6.2f} GB'.format(csize/gbyte))
 for fn in sys.argv[1:]:
-    print(fn)
-exit(1)
-for fn in sys.argv[1:]:
     if re.match('^--',fn): continue
     elif not os.path.exists(fn) :
         if opt['Verbose'] : print('## file {} cannot be accessed'.format(fn))
