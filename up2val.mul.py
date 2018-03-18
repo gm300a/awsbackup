@@ -34,7 +34,8 @@ opt={'Account': MyAccount, 'VaultName': MyVault,'Verbose': ('--verbose' in sys.a
      'Move2Done': '--move-to-done' in sys.argv and os.path.exists('done') and os.path.isdir('done')}
 
 if opt['Move2Done'] : print('# when the upload is completed, file is moved to ./done/.')
-opt['MinSize'] = int(csize/128) if opt['Move2Done'] else 0
+#opt['MinSize'] = int(csize/128) if opt['Move2Done'] else 0
+opt['MinSize']=0 
 
 (fcnt,gbyte,awstmp)=(0,1024*1024*1024,'aws glacier {} --account-id '+opt['Account'])
 awstmp=awstmp+' --vault-name {}'.format(opt['VaultName'])
