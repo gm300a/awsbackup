@@ -29,13 +29,16 @@ if not opt['Full'] and opt['Range'] == 0:
 if opt['Range'] != 0 and (opt['Range']+1) % 1024*1024 != 0:
     opt['Range'] = int((opt['Range']+1024*1024-1)/1024/1024)*1024*1024-1
     print('# range is aligned to MB boundary,{}'.format(opt['Range']))
-    
+
 jvault=dict()
 t = '@None@' if not '--vault-name' in argv else argv[argv.index('--vault-name')+1]
 if os.path.exists('.glaws.vault.json'):
     with open('.glaws.vault.json','r') as fh: jvault=json.load(fh)
-    for m in jvault['VaultList']:
-        if 'ShortName' in m and m['ShortName'] == t: t=m['VaultName']
+    if len(jvault['VaultList']) == 1 and t == '@None@' :
+        t = jvault['VaultList'][0]['VaultName']
+    else:
+        for m in jvault['VaultList']:
+            if 'ShortName' in m and m['ShortName'] == t: t=m['VaultName']
 opt['VaultName']=t
 jjob=dict()
 t = '@None@' if not '--job-id' in argv else argv[argv.index('--job-id')+1]
@@ -48,8 +51,6 @@ if os.path.exists('.glaws.job.json'):
         if 'VaultName' in m and (not ('VaultName' in opt) or opt['VaultName'] == '@None@') :
             opt['VaultName'] = m['VaultName']
 opt['JobId']=t
-#print(opt['VaultName'])
-#print(opt['JobId'])
 if argv[0] == 'bucket' or argv[0] == 'vault':
     if argv[1] == 'ls':
         if not opt['Verbose']:print("#sid #name")
@@ -59,7 +60,7 @@ if argv[0] == 'bucket' or argv[0] == 'vault':
         jvault=json.loads(r)
         cnt=0
         for m in jvault['VaultList']:
-            m['ShortName'] = ("@V%2.2x" % cnt)
+            m['ShortName']=("@V%2.2x" % cnt)
             cnt = cnt+1
             print((m['ShortName']+' '),end='')
             if opt['Verbose']:
@@ -113,11 +114,12 @@ elif argv[0] == 'job':
                 if not os.path.exists(opt['FileName']):break
 
         print('## output to',opt['FileName'])
-#        exit(1)
         t0 = datetime.now()
+        print(awstmp.format('get-job-output')+' --vault-name {}'.format(opt['VaultName']) +
+               ' --job-id {} {}'.format(opt['JobId'],opt['FileName']))
         (s,r)=subprocess.getstatusoutput(
-            'aws glacier get-job-output --account-id {} --vault-name {} '.format(opt['Account'],opt['VaultName']) +
-               '--job-id {} {}'.format(opt['JobId'],opt['FileName']))
+            awstmp.format('get-job-output')+' --vault-name {}'.format(opt['VaultName']) +
+               ' --job-id {} {}'.format(opt['JobId'],opt['FileName']))
         if s != 0 : errorexit(r)
         t1 = datetime.now()
         print('# download %s %d day, %d sec, %d msec' % (opt['FileName'],(t1-t0).days,(t1-t0).seconds,(t1-t0).microseconds))
@@ -129,7 +131,7 @@ elif argv[0] == 'job':
         for m in jjob['JobList']:
             if opt['JobId'] == m['JobId'] and 'ArchiveSizeInBytes' in m:
                 jo['GetOps']['Size'] = m['ArchiveSizeInBytes']
-                
+
         with open('.glaws.getjob.log','a') as fh:
             json.dump(jo,fp=fh)
             fh.write('\n')
@@ -173,7 +175,7 @@ elif argv[0] == 'archieve' or argv[0] == 'arch':
                     #sz=('{:6.2f}'.format(int(m['Size'])/1024./1024./1024.)) if opt['HumanRead'] else ('{:10}'.format(int['Size']))
             sz=('{:5.2f}'.format(int(m['Size'])/1024./1024./1024.)) if opt['HumanRead'] else ('{:15}'.format(int(m['Size'])))
             cd=(m['CreationDate'].replace('T',' ').replace('Z',' ')) if opt['Verbose'] else ''
-            im=('' if not opt['ShowId'] else m['ArchiveId']) # 
+            im=('' if not opt['ShowId'] else m['ArchiveId']) #
             print('{} {} {} '.format(m['ShortName'],cd,sz),end='')
             print('{} {}'.format(dsc.encode('utf-8'),im))
             #print('{} {} {:7,}G {}'.format(m['ShortName'],m['CreationDate'],m['Size'],dsc))
@@ -188,7 +190,7 @@ elif argv[0] == 'archieve' or argv[0] == 'arch':
             for m in jo['ArchiveList']:
                 if 'ShortName' in m and m['ShortName'] == opt['ArchiveID'] or m['ArchiveId'] == opt['ArchiveID']:
                     opt['ArchiveID'] = m['ArchiveId']
-                    opt['Description'] = m['ArchiveDescription'] 
+                    opt['Description'] = m['ArchiveDescription']
                     break
             if len(opt['ArchiveID']) < 10:
                 errorexit('error, Archive ID too short or incorrect ({})'.format(opt['ArchiveID']))
@@ -202,13 +204,11 @@ elif argv[0] == 'archieve' or argv[0] == 'arch':
         a=awstmp.format('initiate-job')+\
            ' --job-parameters \'{}\''.format(json.dumps(jpar))+\
            ' --vault-name {}'.format(opt['VaultName'])
-        print(a)
-#        exit(1)
         (s,r)=subprocess.getstatusoutput(a)
         if s != 0 : errorexit(r)
         if opt['Verbose']:print('## jobs id is {}'.format(r['JObId']))
     else: errorexit('error, option for archive is \"submit-ls\" or \"describe\"')
-        
+
 elif argv[0] == 'config' or argv[0] == 'conf':
     if argv[1] == 'region':
         if len(argv) < 3:
@@ -218,7 +218,4 @@ elif argv[0] == 'config' or argv[0] == 'conf':
             print(fh.readline(),end='')
 #            (d,p)=input().rstrip().split(' ')
 else:errorexit('error, object type must be one \"vault\",\"job\",\"archive\"')
-            #print(subprocess.getoutput('aws glacier initiate-job --account-id %s --vault-name %s --job-parameters %s' % (opt['Account'],argv[argv.index('--vault-name')+1],"\'{\"Type\": \"inventory-retrieval\"}\'")))
-        #if argv[2] != '--verbose': print("#name")
-        #else: print("#archive size name")
 
