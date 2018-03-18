@@ -8,14 +8,18 @@ from treehash import TreeHash
 from keygen import *
 
 opt=dict()
-(cs,css,csh,csd,opt['Verbose'])=(1024*1024*256,1024*1024*16,1024*16,10,('--verbose' in sys.argv))
+(cs,css,csh,csd)=(1024*1024*256,1024*1024*16,1024*16,10)
 rt=int('1'+'0'*(csd+1))
+opt={'NoTmp': '--no-tmp' in sys.argv or '--no-temp' in sys.argv,
+     'Verbose': '--verbose' in sys.argv }
 
 for fn in sys.argv[1:]:
     if fn == '--verbose': continue
+
     (fs,fm)=(os.path.getsize(fn),datetime.now().strftime('%Y%m%d.%H%M%S.meta'))
-    ft=os.environ.get('TMP')+'/'+fm+'.tmp'
-    print('### tmp=',ft)
+    ft=('' if 1024*1024*1024*32 <fs or opt['NoTmp'] else os.environ.get('TMP')+'/')+fm+'.tmp'
+#    print('### tmp=',ft)
+#    exit(1)
     print('# processing.. ',fn)
     if opt['Verbose']: print('## formatting to.. ',fm)
 
