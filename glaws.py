@@ -115,11 +115,10 @@ elif argv[0] == 'job':
 
         print('## output to',opt['FileName'])
         t0 = datetime.now()
-        print(awstmp.format('get-job-output')+' --vault-name {}'.format(opt['VaultName']) +
-               ' --job-id {} {}'.format(opt['JobId'],opt['FileName']))
-        (s,r)=subprocess.getstatusoutput(
-            awstmp.format('get-job-output')+' --vault-name {}'.format(opt['VaultName']) +
-               ' --job-id {} {}'.format(opt['JobId'],opt['FileName']))
+        tcmd=awstmp.format('get-job-output')+' --vault-name {}'.format(opt['VaultName']) +
+               ' --job-id {} {}'.format(opt['JobId'],opt['FileName'])
+        #print(tcmd)
+        (s,r)=subprocess.getstatusoutput(tcmd)
         if s != 0 : errorexit(r)
         t1 = datetime.now()
         print('# download %s %d day, %d sec, %d msec' % (opt['FileName'],(t1-t0).days,(t1-t0).seconds,(t1-t0).microseconds))
@@ -141,12 +140,10 @@ elif argv[0] == 'archieve' or argv[0] == 'arch':
     if argv[1] == 'submit-ls':
         if opt['VaultName'] == '@None@': errorexit('error, --vault-name is needed')
         jpar=dict({'Type':'inventory-retrieval'})
-        print(\
-            awstmp.format('initiate-job')+' --vault-name {}'.format(opt['VaultName'])+\
-            ' --job-parameters \'{}\''.format(json.dumps(jpar)))
-        (s,r)=subprocess.getstatusoutput(\
-            awstmp.format('initiate-job')+' --vault-name {}'.format(opt['VaultName'])+\
-            ' --job-parameters \'{}\''.format(json.dumps(jpar)))
+        tcmd=awstmp.format('initiate-job')+' --vault-name {}'.format(opt['VaultName'])+\
+            ' --job-parameters \'{}\''.format(json.dumps(jpar))
+        #print(tcmd)
+        (s,r)=subprocess.getstatusoutput(tcmd)
         if s != 0 :errorexit(r)
         jo=json.loads(r)
         print('# job id {}'.format(jo['jobId']))
