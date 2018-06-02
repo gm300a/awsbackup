@@ -21,8 +21,10 @@ opt={'Account':MyAccount,
      'V3File':('--v3-file-name' in argv or '-v3' in argv),\
      'Verbose':('--verbose' in argv),'ShowId':('--show-id' in argv),\
      'HumanRead':('-h' in argv or '--human-readable' in argv)}
+#print('## opt range {}'.format(opt['Range']))
 if '--range-test' in argv:
     opt['Range'] = int(argv[argv.index('--range-test')+1])
+#print('## opt range {}'.format(opt['Range']))
 awstmp='aws glacier {} --account-id '+opt['Account']
 if not opt['Full'] and opt['Range'] == 0:
     opt['Range'] = 1024*1024-1
@@ -92,6 +94,7 @@ elif argv[0] == 'job':
             elif not m['Completed']: print("%-25s %-25s %s" % (m['CreationDate'],m['StatusCode'],s))
             else:                    print("%-25s %-25s %s" % (m['CreationDate'],m['CompletionDate'],s))
             cnt = cnt+1
+        if cnt == 0 :print('## no job found')
         with open('.glaws.job.json','w') as fh:json.dump(jjob,fp=fh)
     elif argv[1] == 'describe' or argv[1] == 'des':
         if opt['VaultName'] == '@None@' or opt['JobId'] == '@None': print('error, --vault-name is needed')
@@ -115,7 +118,7 @@ elif argv[0] == 'job':
 
         print('## output to',opt['FileName'])
         t0 = datetime.now()
-        tcmd=awstmp.format('get-job-output')+' --vault-name {}'.format(opt['VaultName']) +
+        tcmd=awstmp.format('get-job-output')+' --vault-name {}'.format(opt['VaultName']) +\
                ' --job-id {} {}'.format(opt['JobId'],opt['FileName'])
         #print(tcmd)
         (s,r)=subprocess.getstatusoutput(tcmd)
@@ -135,7 +138,7 @@ elif argv[0] == 'job':
             json.dump(jo,fp=fh)
             fh.write('\n')
     else:
-        print('error, option for job is \"ls\" or \"describe\"')
+        print('error, option for job is \"ls\", \"describe\" or "get"')
 elif argv[0] == 'archieve' or argv[0] == 'arch':
     if argv[1] == 'submit-ls':
         if opt['VaultName'] == '@None@': errorexit('error, --vault-name is needed')
@@ -193,6 +196,9 @@ elif argv[0] == 'archieve' or argv[0] == 'arch':
                 errorexit('error, Archive ID too short or incorrect ({})'.format(opt['ArchiveID']))
         jpar=dict({'Type' : 'archive-retrieval', 'ArchiveId' : opt['ArchiveID'],'Tier' : 'Bulk',\
                    'Description' : opt['Description']})
+        print('## json jpar {}'.format(json.dumps(jpar)))
+        #print('## opt range {}'.format(opt['Range']))
+        print("### you need to specify the option to down load whole file")
         if opt['Range'] != 0:
             jpar['RetrievalByteRange'] = '{}-{}'.format(0,opt['Range'])
             if 1024*1024*128 < opt['Range']: r='{:.3}G'.format(opt['Range']/1024/1024/1024)
@@ -201,10 +207,15 @@ elif argv[0] == 'archieve' or argv[0] == 'arch':
         a=awstmp.format('initiate-job')+\
            ' --job-parameters \'{}\''.format(json.dumps(jpar))+\
            ' --vault-name {}'.format(opt['VaultName'])
+        print('## debug {}'.format(a))
+        print('## json jpar {}'.format(json.dumps(jpar)))
+        
         (s,r)=subprocess.getstatusoutput(a)
         if s != 0 : errorexit(r)
-        if opt['Verbose']:print('## jobs id is {}'.format(r['JObId']))
-    else: errorexit('error, option for archive is \"submit-ls\" or \"describe\"')
+        print('next line may cause an error. but job is already submitted successfully')
+        jo=json.loads(r)
+        if opt['Verbose']:print('# job id {}'.format(jo['jobId']))
+    else: errorexit('error, option for archive is \"submit-ls\", "submit-copy", "cache-ls" or \"describe\"')
 
 elif argv[0] == 'config' or argv[0] == 'conf':
     if argv[1] == 'region':
